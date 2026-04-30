@@ -602,9 +602,11 @@ app.delete('/api/donors/:id', async (req, res)=>{
 //making a donation using the donor info
 const Donation = require('./models/Donations')
 app.post('/api/donations/', async (req, res)=>{
-  console.log(req.body)
+  req.body.donationReference = `DON-${(req.body.donorId).slice(1,8)}`;
+  console.log("donation coming from donations page",req.body)
   try {
-    await Donation.create(req.body)
+    // const preResponse = await Donor.findOne({_id: req.body.donorId})
+    const response = await Donation.create(req.body)
     const response2 = await Donor.findOneAndUpdate({_id: req.body.donorId},{
       lastDonated: req.body.createdAt,
       $inc: {donationCount: 1, totalDonated: req.body.amount * 1},
@@ -619,17 +621,65 @@ app.post('/api/donations/', async (req, res)=>{
   }
 })
 
-// app.get('/api/donor', async (req, res)=>{
-//   const id = req.params.id;
-//   try {
-//     const response = await Donation.find({donorId: id});
-//     console.log()
-//     res.send(response)
-//   } catch (err) {
-//     console.log(err)
-//     res.end();
-//   }
-// })
+app.get('/api/donations', async (req, res)=> {
+  console.log(req.query);
+  const {search = '', page=1, limit=50, status, donationType} = req.query;
+  let searchQuery = {};
+  if(search){
+    searchQuery = {donorName: {$regex: search, $options: 'i'}}
+  }
+  if(status){
+    searchQuery.status = status
+  }
+  if(donationType){
+    searchQuery.donationType = donationType
+  }
+  try {
+    const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit)
+    console.log(response)
+    res.send(response)
+    // res.end()
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.get('/api/donations/:id', async (req, res)=>{
+  const id = req.params.id;
+  try {
+    const response = await Donation.findById({_id: id})
+    console.log("RESPOOOOOOOOOOOOOOOOONSE", response)
+    res.send(response)
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.put('/api/donations/:id', async (req, res)=> {
+  const id = req.params.id;
+  try {
+    const response = await Donation.findByIdAndUpdate({_id: id}, req.body)
+    console.log(response)
+    res.end();
+  } catch (err) {
+    console.log(err)
+    res.end();
+  }
+})
+app.delete('/api/donations/:id', async (req, res)=> {
+  const id = req.params.id;
+
+  try {
+    const response = await Donation.deleteOne({_id: id})
+    console.log(response)
+    res.end();
+  } catch (err) {
+    console.log(err)
+    res.end();
+  }
+})
 
 
 const PORT = process.env.PORT || 3000;

@@ -8,6 +8,11 @@ const donationSchema = new mongoose.Schema(
       required: [true, "Donor is required"],
     },
 
+    donorName:{
+      type: String,
+      required: true
+    },
+
     donationType: {
       type: String,
       enum: ["monetary", "in_kind"],
@@ -41,6 +46,7 @@ const donationSchema = new mongoose.Schema(
 
     donationReference: {
       type: String,
+      required: true,
       trim: true,
       default: "",
     },
