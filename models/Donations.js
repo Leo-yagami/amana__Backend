@@ -46,7 +46,7 @@ const donationSchema = new mongoose.Schema(
 
     donationReference: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
       default: "",
     },

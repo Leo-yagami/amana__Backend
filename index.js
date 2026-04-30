@@ -535,7 +535,7 @@ app.get('/api/support-history', async (req, res) =>{
 
 //donors page
 app.get('/api/donors', async (req, res)=> {
-  console.log(req.query);
+  // console.log(req.query);
   const {donorType, page = 1, limit = 12, search = ''} = req.query;
   let searchQuery = {}
   if(search){
@@ -546,7 +546,7 @@ app.get('/api/donors', async (req, res)=> {
   }
   try {
     const response = await Donor.find(searchQuery).limit(limit * 1).skip((page - 1) * limit)
-    console.log(response);
+    // console.log(response);
     res.json(response)
   } catch (err) {
     console.error(err)
@@ -579,8 +579,20 @@ app.get('/api/donors/:id', async (req, res)=>{
 
 app.put('/api/donors/:id', async (req, res)=>{
   const id = req.params.id;
+  
+  console.log(req.body)
   try {
-    await Donor.findByIdAndUpdate({_id: id}, req.body)
+    const preResponse = await Donor.findOne({_id: id});
+    console.log(preResponse);
+    if(preResponse.name !== req.body.name){
+      (preResponse.donations).map(donation=> donation.donorName = req.body.name);
+      req.body.donations = preResponse.donations;
+    }
+
+    const response = await Donor.findByIdAndUpdate({_id: id}, req.body)
+    const response2 = await Donations.updateMany({donorId: id}, {donorName: req.body.name})
+
+    console.log(response2)
     res.end()
   } catch (err) {
     console.error(err)
@@ -592,6 +604,7 @@ app.delete('/api/donors/:id', async (req, res)=>{
   const id = req.params.id;
   try {
     await Donor.deleteOne({_id: id})
+    await Donation.deleteMany({donorId: id})
     res.end()
   } catch (err) {
     console.error(err)
@@ -602,13 +615,19 @@ app.delete('/api/donors/:id', async (req, res)=>{
 //making a donation using the donor info
 const Donation = require('./models/Donations')
 app.post('/api/donations/', async (req, res)=>{
-  req.body.donationReference = `DON-${(req.body.donorId).slice(1,8)}`;
+  // console.log(req.body)
+  // req.body.donationReference = `DON-${(req.body.id).slice(1,8)}`;
   console.log("donation coming from donations page",req.body)
   try {
     // const preResponse = await Donor.findOne({_id: req.body.donorId})
-    const response = await Donation.create(req.body)
+    const response = await Donation.create(req.body);
+    const {_id} = response;
+    console.log(response)
+    await Donation.findByIdAndUpdate({_id: _id}, {donationReference: `DON-${(_id.toString()).slice(4,11)}`})
+
+    req.body.id = response._id;
+    req.body.lastDonated = req.body.createdAt;
     const response2 = await Donor.findOneAndUpdate({_id: req.body.donorId},{
-      lastDonated: req.body.createdAt,
       $inc: {donationCount: 1, totalDonated: req.body.amount * 1},
       $push: {donations: req.body},
     }, {new: true})
@@ -622,7 +641,7 @@ app.post('/api/donations/', async (req, res)=>{
 })
 
 app.get('/api/donations', async (req, res)=> {
-  console.log(req.query);
+  // console.log(req.query);
   const {search = '', page=1, limit=50, status, donationType} = req.query;
   let searchQuery = {};
   if(search){
@@ -636,7 +655,7 @@ app.get('/api/donations', async (req, res)=> {
   }
   try {
     const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit)
-    console.log(response)
+    // console.log(response)
     res.send(response)
     // res.end()
   } catch (err) {
@@ -672,8 +691,18 @@ app.delete('/api/donations/:id', async (req, res)=> {
   const id = req.params.id;
 
   try {
-    const response = await Donation.deleteOne({_id: id})
-    console.log(response)
+    const response = await Donation.findOne({_id: id});
+    const resp = await Donor.findOne({_id: response.donorId})
+    let amount = response.amount;
+    amount=resp.totalDonated - amount * 1;
+    console.log("IMPORTANT",typeof(amount))
+    // console.log("donation to be removed", response)
+    // console.log("donation in donor to be removed", resp)
+    console.log(resp.donations, response.donorId)
+    const toBeRemoved = resp.donations.filter(donation=>donation.id.toString() !== response.id.toString());
+    const upRes = await Donor.findByIdAndUpdate({_id: response.donorId}, {donations: toBeRemoved, totalDonated: amount})
+    console.log(toBeRemoved)
+    await Donation.deleteOne({_id: id})
     res.end();
   } catch (err) {
     console.log(err)

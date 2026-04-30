@@ -3,6 +3,10 @@ const {donationSchema} = require('./Donations')
 
 const donorSchema = new mongoose.Schema(
   {
+    id: {
+      type: String,
+      trim: true,
+    },
     name: {
       type: String,
       required: [true, "Donor name is required"],
