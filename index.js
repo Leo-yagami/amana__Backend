@@ -638,7 +638,7 @@ app.put('/api/donors/:id', async (req, res)=>{
     }
 
     const response = await Donor.findByIdAndUpdate({_id: id}, req.body)
-    const response2 = await Donations.updateMany({donorId: id}, {donorName: req.body.name})
+    const response2 = await Donation.updateMany({donorId: id}, {donorName: req.body.name})
 
     console.log(response2)
     res.end()
@@ -716,7 +716,7 @@ app.get('/api/donations/:id', async (req, res)=>{
   const id = req.params.id;
   try {
     const response = await Donation.findById({_id: id})
-    console.log("RESPOOOOOOOOOOOOOOOOONSE", response)
+    // console.log("RESPOOOOOOOOOOOOOOOOONSE", response)
     res.send(response)
   } catch (err) {
     console.log(err)
@@ -727,8 +727,27 @@ app.get('/api/donations/:id', async (req, res)=>{
 app.put('/api/donations/:id', async (req, res)=> {
   const id = req.params.id;
   try {
-    const response = await Donation.findByIdAndUpdate({_id: id}, req.body)
-    console.log(response)
+    const updatedDonation = await Donation.findByIdAndUpdate({_id: id}, req.body, {new: true})
+    const donorId = updatedDonation.donorId;
+    // console.log(updatedDonation)
+    const donorInfo = await Donor.findOne({_id: donorId});
+    console.log(donorInfo)
+    const index = donorInfo.donations.findIndex(i => (i.id || i._id).toString() === id);
+    if(index !== -1){
+      donorInfo.donations[index] = updatedDonation;
+      console.log("INDEX",index)
+    }
+    // donorInfo.donations.map(donation=>{
+    //   if(donation.id === id) return donation = updatedDonation
+    //   else return donation
+    // })
+    const newTotal = donorInfo.donations.reduce((total,donation)=>{
+      return total+=(donation.amount * 1);
+    }, 0)
+    console.log(newTotal)
+    donorInfo.totalDonated = newTotal;
+    const finalDonor = await Donor.findByIdAndUpdate({_id: donorId}, donorInfo, {new: true})
+    console.log(finalDonor);
     res.end();
   } catch (err) {
     console.log(err)
@@ -747,7 +766,7 @@ app.delete('/api/donations/:id', async (req, res)=> {
     // console.log("donation to be removed", response)
     // console.log("donation in donor to be removed", resp)
     console.log(resp.donations, response.donorId)
-    const toBeRemoved = resp.donations.filter(donation=>donation.id.toString() !== response.id.toString());
+    const toBeRemoved = resp.donations.filter(donation=>donation._id.toString() !== response.id.toString());
     const upRes = await Donor.findByIdAndUpdate({_id: response.donorId}, {donations: toBeRemoved, totalDonated: amount})
     console.log(toBeRemoved)
     await Donation.deleteOne({_id: id})
