@@ -69,7 +69,7 @@ const donorSchema = new mongoose.Schema(
     },
     lastDonated: {
       type: Date, 
-      default: Date.now
+      default: null,
     },
     donationCount: {
       type: Number,

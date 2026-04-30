@@ -255,6 +255,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
+const jwt = require('jsonwebtoken')
 const request = require("request");
 const Transaction = require('./models/Transaction')
 const Family = require('./models/Family')
@@ -264,8 +265,8 @@ const Donor = require('./models/Donors')
 require('./config/passport'); // Initialize passport config
 
 const authRoutes = require('./routes/auth');
-const googleAuthRoutes = require('./routes/googleAuth');
-const Donations = require('./models/Donations');
+const {googleAuthRoutes} = require('./routes/googleAuth');
+const Donation = require('./models/Donations');
 
 const app = express();
 
@@ -290,7 +291,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'development',
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
@@ -303,29 +304,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes); // Mounts /api/auth/google
 
 //Payment section
-//payload object
-let options = {
-    'method': 'POST',
-    'url': 'https://api.chapa.co/v1/transaction/initialize',
-    'headers': {
-  'Authorization': 'Bearer CHASECK_TEST-gubJD4pSW7a1AXSMeWRJWm08aU2nGju6',
-  'Content-Type': 'application/json'
-    },
-    body: {
-      "amount": "10",
-      "currency": "ETB",
-      "email": "abebech_bekele@gmail.com",
-      "first_name": "Bilen",
-      "last_name": "Gizachew",
-      "phone_number": "0912345678",
-      "tx_ref": null,
-      "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
-      "return_url": null,
-    }
-
-  };
-
-
 app.get('/makePayment', (req, res) => {
   res.send(`<a href="/initialize">Donate</a>`)
 })
@@ -336,31 +314,100 @@ app.get('/makePayment', (req, res) => {
 // })
 
 app.post("/initialize", (req, res) => {
-  console.log(req.body);
-  const paymentMethod = req.body.paymentMethod;
-  options.body.amount = req.body.selectedAmount || (req.body.customAmount - 0);
-  options.body.phone_number = req.body.telebirrPhone;
+  const paymentInfo = {paymentMethod: req.body.paymentMethod, amount: req.body.selectedAmount || req.body.customAmount * 1, phone: req.body.telebirrPhone}
+  req.session.paymentData = paymentInfo
 
-  res.json({ message: "received", body: req.body });
+  return res.json({ message: "received", body: req.body });
 });
 
 app.get('/initialize', async (req, res) => {
   const tx_ref = "tx-" + Date.now(); // unique reference
-  options.body.tx_ref = tx_ref;
-  options.body.return_url = `http://localhost:3000/paymentComplete?tx_ref=${tx_ref}`;
-  
-  //save payload before going to checkout url and before stringifying the Body attribute
+  const paymentData = req.session.paymentData;
+  if (!paymentData) {
+    return res.status(400).json({ message: "No payment data found. Submit form first." });
+  }
+  const token = req.cookies.token
+  if(!token) return res.status(401).json({message: "not logged in"})
+
+  const decoded = jwt.verify(token,process.env.JWT_SECRET);
+  console.log(decoded)
+
+  //options object
+  let options = {
+    'method': 'POST',
+    'url': 'https://api.chapa.co/v1/transaction/initialize',
+    'headers': {
+  'Authorization': 'Bearer CHASECK_TEST-gubJD4pSW7a1AXSMeWRJWm08aU2nGju6',
+  'Content-Type': 'application/json'
+    },
+    body: {
+      "amount": paymentData.amount,
+      "currency": "ETB",
+      "email": decoded.userEmail,
+      "first_name": decoded.userName,
+      "phone_number": paymentData.phone,
+      "tx_ref": tx_ref,
+      "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
+      "return_url": `http://localhost:3000/paymentComplete?tx_ref=${tx_ref}`,
+    }
+};
+
+
+  //initialize transaction payload and save number to update donor entity
+  let transactionPayload = {
+    donorId: "",
+    donorName: decoded.userName,
+    donationType: "monetary",
+    amount: paymentData.amount,
+    currency: options.body.currency,
+    donationReference: "",
+  }
+  //clearing the session after assigning
+  req.session.paymentData = null;
+
   try{
+    //get donor info through first name and update its phone number
+    const preResponse = await Donor.findOneAndUpdate({email: decoded.userEmail}, {phone: options.body.phone_number});
+    if (!preResponse) {
+      return res.status(404).json({ message: "Donor not found" });
+    }
+     
+    // console.log(preResponse);
+
+    //create a donation with the payload + preResponse information
+    transactionPayload.donorId = preResponse._id;
+    // transactionPayload.donationReference =`DON-${ transactionPayload.donorId.toString().slice(4,11)}`;
+
+    const response = await Donation.create(transactionPayload);
+    const {_id} = response;
+
+    transactionPayload.donationReference = `DON-${_id.toString().slice(4,11)}`;
+
+    const resp = await Donation.findByIdAndUpdate({_id: _id}, {donationReference: transactionPayload.donationReference});
+    console.log("PAYLOAD", transactionPayload)
+
+    const response2 = await Donor.findOneAndUpdate({_id: transactionPayload.donorId},{
+      $inc: {donationCount: 1, totalDonated: transactionPayload.amount},
+      $push: {donations: resp}
+    }, {new: true})
+    console.log(response2)
+    
     await Transaction.createFromPayload(options.body);
   } catch (err) {
     console.log("Failed to make the transaction", err)
   }
   options.body = JSON.stringify(options.body)
-  console.log(options)
+  // console.log(options)
   
   request(options, function (error, response) {
     if (error) throw new Error(error);
-    res.redirect(JSON.parse(response.body).data.checkout_url);
+    const parsed = JSON.parse(response.body);
+
+    if (!parsed?.data?.checkout_url) {
+      console.log("CHAPA ERROR:", parsed);
+      return res.status(400).json(parsed);
+    }
+    return res.redirect(parsed.data.checkout_url);
   });
 })
 
@@ -412,7 +459,7 @@ app.get("/paymentComplete", (req, res) => {
 
           <script>
             ${receiptReference ? `window.open("https://chapa.link/payment-receipt/${receiptReference}", "_blank");` : ""}
-            window.location.href = "http://localhost:8080/";
+            window.location.href = "http://localhost:8080";
           </script>
         </body>
       </html>
@@ -555,9 +602,10 @@ app.get('/api/donors', async (req, res)=> {
 })
 
 app.post('/api/donors', async (req, res)=>{
+  console.log(req.body)
   try {
     const response = await Donor.create(req.body)
-    console.log(response)
+    // console.log(response)
     res.end();
   } catch (err) {
     console.log(err)
@@ -613,7 +661,7 @@ app.delete('/api/donors/:id', async (req, res)=>{
 })
 
 //making a donation using the donor info
-const Donation = require('./models/Donations')
+// const Donation = require('./models/Donations')
 app.post('/api/donations/', async (req, res)=>{
   // console.log(req.body)
   // req.body.donationReference = `DON-${(req.body.id).slice(1,8)}`;
