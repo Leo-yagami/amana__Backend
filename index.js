@@ -777,6 +777,47 @@ app.delete('/api/donations/:id', async (req, res)=> {
   }
 })
 
+//DASHBOARD WOOOOOOOOOOOOOOOOOOOOOOOOO --  approach no model 
+//calling from existing models
+app.get('/api/dashboard/overview', async (req, res)=>{
+  const payload = {families: {}, donors: {}, donations: {},};
+  try {
+    const AllFamilies = await Family.find({});
+    const AllDonors = await Donor.find({});
+    const AllDonations = await Donation.find({});
+    // console.log("families", AllFamilies)
+    // console.log("donors", AllDonors)
+    // console.log("donations", AllDonations)
+    //calculating what needs to be calculated
+      //this month donations
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+      const thisMonthDono = await Donation.find({receivedAt: {
+        $gte: monthStart,
+        $lt: monthEnd,
+      }});
+      console.log(monthStart, monthEnd)
+      const totalAmount = AllDonations.reduce((total, dono)=>total+=dono.amount,0);
+      console.log("This month's donations", thisMonthDono)
+      console.log("total donations all time", totalAmount);
+
+    payload.families.total = AllFamilies.length;
+
+    payload.donors.total = AllDonors.length;
+    payload.donors.active = 0;
+
+    payload.donations.totalCount = AllDonations.length;
+    payload.donations.recurringCount = 0
+
+
+    res.end()
+  } catch (err) {
+    console.log(err)
+  }
+})
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
