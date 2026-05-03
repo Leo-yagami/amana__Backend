@@ -26,7 +26,6 @@ const FamilySchema = new mongoose.Schema(
     familyCode: { type: String, required: true, unique: true, index: true },
     familyName: { type: String, required: true, trim: true },
     familyHead: { type: String, required: false, trim: true },
-
     primaryPhone: {
       type: String,
       required: true,

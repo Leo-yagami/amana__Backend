@@ -261,6 +261,7 @@ const Transaction = require('./models/Transaction')
 const Family = require('./models/Family')
 const Support = require('./models/Support')
 const Donor = require('./models/Donors')
+const Event = require('./models/Event')
 
 require('./config/passport'); // Initialize passport config
 
@@ -571,7 +572,7 @@ app.get('/api/support-history', async (req, res) =>{
   const {page = 1, limit = 50} = req.query;
   const id = req.query.familyId;
   try {
-    const response = await Support.find({familyId: id}).limit(limit * 1).skip((page - 1) * limit)
+    const response = await Support.find({familyId: id}).limit(limit * 1).skip((page - 1) * limit).populate("family")
     console.log(response);
     res.status(201).json(response)
   } catch (err) {
@@ -679,6 +680,12 @@ app.post('/api/donations/', async (req, res)=>{
       $inc: {donationCount: 1, totalDonated: req.body.amount * 1},
       $push: {donations: req.body},
     }, {new: true})
+
+    //update events
+    await Event.findByIdAndUpdate({_id: response.eventId}, {
+      $push: {donations: response._id},
+      $inc: {"_count.donation": 1, collectedAmount: req.body.amount},
+    })
     // console.log("response", response)
     console.log("response for donors update", response2)
     res.end()
@@ -710,6 +717,13 @@ app.get('/api/donations', async (req, res)=> {
     console.log(err)
     res.end()
   }
+})
+
+app.get('/api/donations/months', async (req, res)=>{
+  // console.log(req.body);
+  const months = req.query."months[]";
+  console.log(months);
+  res.end()
 })
 
 app.get('/api/donations/:id', async (req, res)=>{
@@ -759,16 +773,20 @@ app.delete('/api/donations/:id', async (req, res)=> {
 
   try {
     const response = await Donation.findOne({_id: id});
+    // console.log(response);
     const resp = await Donor.findOne({_id: response.donorId})
     let amount = response.amount;
-    amount=resp.totalDonated - amount * 1;
-    console.log("IMPORTANT",typeof(amount))
+    amount=resp.totalDonated - (amount * 1);
+    let donationCount = resp.donationCount - 1;
+    // console.log("IMPORTANT",typeof(amount))
     // console.log("donation to be removed", response)
     // console.log("donation in donor to be removed", resp)
-    console.log(resp.donations, response.donorId)
-    const toBeRemoved = resp.donations.filter(donation=>donation._id.toString() !== response.id.toString());
-    const upRes = await Donor.findByIdAndUpdate({_id: response.donorId}, {donations: toBeRemoved, totalDonated: amount})
-    console.log(toBeRemoved)
+    // console.log("donations to be tested: ",resp.donations,"donation to be removed", response.donorId)
+
+    const toBeRemoved = resp.donations.filter(donation=>(donation?.id?.toString() || donation?._id?.toString()) !== response._id.toString());
+
+    const upRes = await Donor.findByIdAndUpdate({_id: response.donorId}, {donations: toBeRemoved, totalDonated: amount, donationCount: donationCount})
+    // console.log("This is going to be kept alive", toBeRemoved)
     await Donation.deleteOne({_id: id})
     res.end();
   } catch (err) {
@@ -780,11 +798,12 @@ app.delete('/api/donations/:id', async (req, res)=> {
 //DASHBOARD WOOOOOOOOOOOOOOOOOOOOOOOOO --  approach no model 
 //calling from existing models
 app.get('/api/dashboard/overview', async (req, res)=>{
-  const payload = {families: {}, donors: {}, donations: {},};
+  const payload = {families: {}, donors: {}, donations: {}, events: {},};
   try {
     const AllFamilies = await Family.find({});
     const AllDonors = await Donor.find({});
     const AllDonations = await Donation.find({});
+    const AllEvents = await Event.find({})
     // console.log("families", AllFamilies)
     // console.log("donors", AllDonors)
     // console.log("donations", AllDonations)
@@ -797,27 +816,338 @@ app.get('/api/dashboard/overview', async (req, res)=>{
         $gte: monthStart,
         $lt: monthEnd,
       }});
-      console.log(monthStart, monthEnd)
+      // console.log(monthStart, monthEnd)
       const totalAmount = AllDonations.reduce((total, dono)=>total+=dono.amount,0);
-      console.log("This month's donations", thisMonthDono)
-      console.log("total donations all time", totalAmount);
+      // console.log("This month's donations", thisMonthDono)
+      // console.log("total donations all time", totalAmount);
+      const monthDonoTotal = thisMonthDono.reduce((total, dono)=> total+=dono.amount, 0);
+      // console.log("This month's total",monthDonoTotal)
+      const monthlyDonorIds = new Set (
+        thisMonthDono.filter(dono=>dono.donorId)
+        .map(dono=>dono.donorId = dono.donorId.toString())
+      )
+      // console.log("ACTIIIIIIIIIVE IDS",monthlyDonorIds)
+      const activeDonors = AllDonors
+      .filter(donor=> monthlyDonorIds.has(donor._id.toString()))
+      // console.log("ACTIIIIIIVE",activeDonors)
+
+
+      const verifiedFam = AllFamilies.reduce((famCount, fam)=>famCount+= fam.registrationStatus === "verified"? 1: 0,0)
+      // console.log("Verified Fam", verifiedFam);
+
+      const urgentFam = AllFamilies.reduce((famCount, fam)=> famCount+= fam.urgencyLevel === "high" || fam.urgencyLevel === "critical"? 1: 0, 0)
+      // console.log("Urgent Family", urgentFam);
+      const activeEvents = AllEvents.filter(event=> event.isActive)
+
 
     payload.families.total = AllFamilies.length;
+    payload.families.verified = verifiedFam;
+    payload.families.urgent = urgentFam;
 
     payload.donors.total = AllDonors.length;
-    payload.donors.active = 0;
+    payload.donors.active = activeDonors.length;
 
     payload.donations.totalCount = AllDonations.length;
     payload.donations.recurringCount = 0
+    payload.donations.totalAmount = totalAmount;
+    payload.donations.monthlyAmount = monthDonoTotal;
 
+    payload.events.total = AllEvents.length;
+    payload.events.active = activeEvents.length;
+    // console.log(payload);
 
-    res.end()
+    res.send(payload)
   } catch (err) {
     console.log(err)
   }
 })
 
+app.get('/api/dashboard/top-donors', async (req, res)=>{
+  let topDonors = []
+  try {
+    let donors = await Donor.find({}, {_id: 1, name: 1, totalDonated: 1, donationCount: 1});
+    donors = donors.sort((donorA,donorB)=> donorA.amount-donorB.amount);
+    donors.forEach(donor=> {
+      let payload = {};
+      payload.id = donor._id;
+      payload.name = donor.name;
+      payload.totalAmount = donor.totalDonated;
+      payload.donationCount = donor.donationCount
+      topDonors.push(payload);
+    })
+    // console.log("TOP DONORS: ", topDonors);
+    res.send(topDonors.slice(0, req.query.limit));
 
+  } catch (err) {
+    console.log("Couldn't get top donors: ", err)
+  }
+
+})
+
+app.get('/api/dashboard/recent-activities', async (req, res)=> {
+  const {limit} = req.query
+  let recentActivities = [];
+  try {
+    const recentDonors = await Donor.find({}).sort({createdAt: -1}).limit(limit/3);
+    const recentDonations = await Donation.find({}).sort({createdAt: -1}).limit(limit/3);
+    const recentFamilies = await Family.find({}).sort({createdAt: -1}).limit(limit/3);
+    // console.log("Top 3 Donors", recentDonors);
+    // console.log("Top 3 Donations", recentDonations);
+    // console.log("Top 3 Families", recentFamilies);
+
+    recentDonors.forEach(donor=>{
+      let payload = {
+        id: "",
+        type: "",
+        description: "",
+        timestamp: "",
+        metadata: {}
+      };
+      payload.id = donor._id;
+      payload.type = "Donor Registered";
+      payload.description = `New Donor registered: ${donor.name} (${donor.donorCode})`;
+      payload.timestamp = donor.createdAt;
+      payload.metadata = {
+        donorId: donor._id,
+        donorCode: donor.donorCode,
+        name: donor.name,
+        donorType: "Individual",
+      }
+      recentActivities.push(payload)
+    })
+    console.log("activities with donors", recentActivities)
+    
+    
+    recentDonations.forEach(donation=>{
+      let payload = {
+        id: "",
+        type: "",
+        description: "",
+        timestamp: "",
+        metadata: {}
+      };
+      payload.id = donation?._id || donation?.id;
+      payload.type = "Donation Received";
+      payload.description = `Donation ${donation.currency} ${donation.amount} received from ${donation.donorName}`;
+      payload.timestamp = donation.createdAt;
+      payload.metadata = {
+        donationId: donation._id,
+        donationCode: donation.donationCode,
+        amount: donation.amount,
+        currency: donation.currency,
+      }
+      recentActivities.push(payload)
+    })
+    console.log("activities with donations", recentActivities)
+
+    recentFamilies.forEach(family=>{
+      let payload = {
+        id: "",
+        type: "",
+        description: "",
+        timestamp: "",
+        metadata: {}
+      };
+      console.log("family individual: ", family)
+      payload.id = family._id;
+      payload.type = "family Registered";
+      payload.description = `Family ${family.familyCode} registered ( ${family?.members?.length} members)`;
+      payload.timestamp = family.createdAt;
+      payload.metadata = {
+        familyId: family._id,
+        familyCode: family.familyCode,
+      }
+      recentActivities.push(payload)
+    })
+    console.log("activities with families", recentActivities)
+    res.send(recentActivities);
+  } catch (err) {
+    console.log("Couldn't get the recent activities: ", err)
+    res.end();
+  }
+})
+
+//events apis
+app.post('/api/events', async (req, res)=> {
+  
+  try {
+    const response = await Event.create(req.body);
+    let campaignCode = `EVT-${response._id.toString().slice(0,8)}`;
+    const updatedResponse = await Event.findByIdAndUpdate({_id: response._id}, {campaignCode: campaignCode}, {new: true});  
+    console.log(updatedResponse)
+    res.end()
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.get('/api/events', async (req, res)=> {
+  console.log(req.query)
+  const {page = 1, limit = 10, search = '', status, eventType} = req.query;
+
+  let searchQuery = {};
+  if(search){
+    searchQuery.$or= [
+      {title: {$regex: search, $options: 'i'}},
+      {campaignCode: {$regex: search, $options: 'i'}}
+      ]
+    }
+
+  if(status){
+    if(status === "Active"){
+    searchQuery.isActive = true;
+    }
+    else 
+    searchQuery.status = status
+  }
+
+  if(eventType){
+    searchQuery.eventType = eventType
+  }
+  
+
+  try {
+    const response = await Event.find(searchQuery).limit(limit).skip((page - 1) * limit);
+    res.send(response)
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+//event stats
+app.get('/api/events/:id/stats', async (req,res)=>{
+  const {id} = req.params;
+  let payload = {
+    familiesSupported: 0,
+    uniqueDonors: 0,
+    totalDonations: 0,
+  };
+  try {
+    const event = await Event.findOne({_id: id}).populate([{
+      path: "supportHistory", populate: [
+        {path: "familyId"}, {path: "donorId"}
+      ]
+    },
+    {
+      path: "donations"
+    }
+  ]);
+  // console.log(event);
+
+    //getting unique families supported
+    let supportedFamilies = new Set()
+    event.supportHistory.forEach((support) => {
+      // console.log(support)
+      supportedFamilies.add(support?.familyId?._id?.toString());
+    })
+    payload.familiesSupported = supportedFamilies.size;
+
+
+    //getting unique donors
+    let uniqueDonors = new Set();
+    let totalAmount = 0;
+    // console.log(event.donations)
+    event.donations.forEach(dono => {
+      uniqueDonors.add(dono.donorId.toString())
+      totalAmount+=dono.amount;
+    })
+    payload.uniqueDonors = uniqueDonors.size;
+
+    payload.totalDonations = event.donations.length;
+
+    //calculating total amount
+    payload.totalAmount = totalAmount
+    await Event.findOneAndUpdate({_id: id}, {collectedAmount: totalAmount})
+
+    payload.averageDonation = (totalAmount/payload.totalDonations).toFixed(2) * 1
+
+    payload.completionPercentage = (totalAmount/event.targetAmount).toFixed(2) * 100
+
+    console.log(payload);
+    res.send(payload)
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.get('/api/events/:id', async (req, res)=>{
+  const {id} = req.params;
+  try {
+    const response = await Event.findOne({_id: id}).populate([{path: "supportHistory", populate: [{path: "familyId"},{path: "donorId"}]}, {path: "donations"}]);
+    res.send(response)
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.put('/api/events/:id', async (req, res)=> {
+  const {id} = req.params;
+  if(req.body.status){
+    req.body.isActive = req.body.status === "ongoing";
+  }
+  try {
+    const response = await Event.findByIdAndUpdate({_id: id}, req.body, {new: true});
+    res.end()
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.delete('/api/events/:id', async (req, res)=> {
+  const {id} = req.params;
+  try {
+    await Event.deleteOne({_id: id})
+    res.end()
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
+})
+
+app.post('/api/support-history/bulk', async (req,res)=> {
+  console.log("BODY:", req.body);
+// console.log("BODY.supportData:", req.body.supportData);
+// console.log("BODY.data:", req.body.data);
+  let {familyIds} = req.body;
+  req.body.familyIds = undefined;
+  if(req.body.totalAmount){
+
+    let amount = req.body.distributeEqually? (req.body.totalAmount * 1) /(familyIds.length * 1) : (req.body.amount * 1);
+    req.body.totalAmount = undefined;
+    req.body.amountValue = amount;
+  }
+  if(req.body.eventId){
+    req.body.targetType = "event";
+  }
+  //updating support history count
+  
+  try {
+      //fetch event
+      let event = await Event.findOne({_id: req.body.eventId});
+      let supportHistoryCount = event._count.supportHistory; 
+      console.log("COOOOOOOOUNT", supportHistoryCount);
+      let supports = event.supportHistory;
+
+     for(const id of familyIds){
+      req.body.familyId = id;
+      const response = await Support.create(req.body)
+      console.log(`Family`, response)
+      supports.push(response);
+    }
+    console.log(supports)
+    event = await Event.findOneAndUpdate({_id: req.body.eventId}, {supportHistory: supports, _count: {supportHistory: ++supportHistoryCount}})
+    console.log(event);
+    
+    res.end()
+  } catch (err) {
+    res.end()
+  }
+})
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
