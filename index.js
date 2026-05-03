@@ -721,9 +721,26 @@ app.get('/api/donations', async (req, res)=> {
 
 app.get('/api/donations/months', async (req, res)=>{
   // console.log(req.body);
-  const months = req.query."months[]";
-  console.log(months);
-  res.end()
+  const now = new Date();
+  let monthlyAmounts = [];
+  const {months} = req.query;
+  try {
+    for(let i = months.length - 1; i >= 0; i--){
+      const monthStart = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() -i+1, 1)
+      const monthDono = await Donation.find({receivedAt: {
+        $gte: monthStart,
+        $lt: monthEnd,
+      }})
+      // console.log(monthDono)
+      monthlyAmounts.push(monthDono.reduce((total, dono)=>total+=dono.amount, 0))
+    }
+    // console.log(monthlyAmounts);
+    res.send(monthlyAmounts)
+  } catch (err) {
+    console.log(err)
+    res.end()
+  }
 })
 
 app.get('/api/donations/:id', async (req, res)=>{
@@ -810,8 +827,8 @@ app.get('/api/dashboard/overview', async (req, res)=>{
     //calculating what needs to be calculated
       //this month donations
       const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const thisMonthDono = await Donation.find({receivedAt: {
         $gte: monthStart,
         $lt: monthEnd,
@@ -1145,6 +1162,205 @@ app.post('/api/support-history/bulk', async (req,res)=> {
     
     res.end()
   } catch (err) {
+    res.end()
+  }
+})
+
+app.get('/api/dashboard/analytics', async (req, res)=>{
+  let {range} = req.query;
+
+  const fetchTrendData = async (n) => {
+    // const n = range === "3m" ? 3 : range === "6m" ? 6 : 12;
+  
+    const months = [];
+    const now = new Date();
+  
+    for (let i = n - 1; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(date.toLocaleString("en-US", { month: "short" }));
+    }
+  
+    // const monthResponse = await donationApi.getMonth(months);
+  
+    // return { months, values: monthResponse?.data || [] };
+    return {months};
+  };
+
+
+
+  let payload = {
+    stats: {
+      families: {
+        total: 0,
+        change: 0,
+      },
+      donations: {
+        total: 0,
+        change: 0,
+      },
+      events: {
+        total: 0,
+        change: 0,
+      }
+    },
+    monthlyTrends: {
+      labels: [],
+      values: [],
+    },
+    urgencyLevels: [
+      {
+        label: "Critical",
+        value: 0,
+        color: "#EF4444"
+      },
+      {
+        label: "High",
+        value: 0,
+        color: "#F97316"
+      },
+      {
+        label: "Medium",
+        value: 0,
+        color: "#EAB308"
+      },
+      {
+        label: "Low",
+        value: 0,
+        color: "#22C55E"
+      },
+    ],
+    donationSources: [
+      {
+        label: "Individual",
+        value: 0,
+        color: "#3B82F6"
+      },
+      {
+        label: "Corporate",
+        value: 0,
+        color: "#8B5CF6"
+      },
+      {
+        label: "Foundation",
+        value: 0,
+        color: "#EC4899"
+      },
+      {
+        label: "Organization",
+        value: 0,
+        color: "#64748B"
+      },
+    ],
+    eventTypes: [
+      {
+        label: "Distribution",
+        value: 0,
+        color: "#F59E0B"
+      },
+      {
+        label: "Fundraising",
+        value: 0,
+        color: "#8B5CF6"
+      },
+      {
+        label: "Awareness",
+        value: 0,
+        color: "#EC4899"
+      },
+      {
+        label: "Food Package",
+        value: 0,
+        color: "#22C55E"
+      },
+      {
+        label: "Medical Aid",
+        value: 0,
+        color: "#3B82F6"
+      },
+      {
+        label: "Job Opportunity",
+        value: 0,
+        color: "#1b5e4a"
+      },
+      {
+        label: "Other",
+        value: 0,
+        color: "#64748B"
+      },
+    ]
+  }
+  //lets get the easy ones out of the way
+  const allFamilies = await Family.find({});
+  const allDonors = await Donor.find({});
+  const allEvents = await Event.find({});
+
+  
+  allFamilies.forEach(fam=>{
+    fam.urgencyLevel === "low"? payload.urgencyLevels[3].value++
+    : fam.urgencyLevel === "medium"? payload.urgencyLevels[2].value++
+    : fam.urgencyLevel === "high"? payload.urgencyLevels[1].value++
+    : payload.urgencyLevels[0].value++
+  })
+
+  allDonors.forEach(donor=>{
+    donor.donorType === "Organization"? payload.donationSources[3].value++
+    : donor.donorType === "Foundation"? payload.donationSources[2].value++
+    : donor.donorType === "Corporate"? payload.donationSources[1].value++
+    : payload.donationSources[0].value++
+  })
+
+  allEvents.forEach(event=>{
+    event.eventType === "other"? payload.eventTypes[6].value++
+    : event.eventType === "job_opportunity"? payload.eventTypes[5].value++
+    : event.eventType === "medical_aid"? payload.eventTypes[4].value++ 
+    : event.eventType === "food_package"? payload.eventTypes[3].value++
+    : event.eventType === "awareness"? payload.eventTypes[2].value++
+    : event.eventType === "fundraising"? payload.eventTypes[1].value++
+    : payload.eventTypes[0].value++
+  })
+
+  // console.log("EZ payload insertions: ", payload)
+
+
+  let month = range === "month"? 1 : range === "3m"? 3: range === "6m"? 6 : 12;
+
+  let monthlyFamRegisterations = [];
+  // console.log(months)
+  const now = new Date();
+  try {
+    for(let i = month - 1; i >=0; i--){
+      const monthStart = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth()-i + 1, 1);
+      const monthFam = await Family.find({createdAt: {
+        $gte: monthStart,
+        $lt: monthEnd,
+      }})
+      const monthDono = await Donation.find({receivedAt: {
+        $gte: monthStart,
+        $lt: monthEnd,
+      }})
+      const monthEvent = await Event.find({eventDate: {
+        $gte: monthStart,
+        $lt: monthEnd,
+      }})
+      // console.log(monthDono,monthFam,monthEvent)
+      payload.stats.donations.total+=monthDono.reduce((total, dono)=>total+=dono.amount,0)
+      payload.stats.families.total+=monthFam.length
+      payload.stats.events.total+=monthEvent.length
+
+      //for bar chart for families
+      // payload.monthlyTrends.values.push(monthFam.length)
+      //for bar chart for donations
+      payload.monthlyTrends.values.push(monthDono.reduce((total, dono)=>total+=dono.amount, 0))
+    }
+    //set the months for the monthlyTrends
+    let {months} = await fetchTrendData(month)
+    // console.log(months)
+    months.forEach(month=> payload.monthlyTrends.labels.push(month))
+    // console.log("Finaly payload...kinda", payload)
+    res.send(payload)
+  } catch (err) {
+    console.log(err)
     res.end()
   }
 })
