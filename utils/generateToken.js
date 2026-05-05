@@ -16,7 +16,7 @@ const generateToken = (res, userId,userName, userEmail) => {
   // });
 
   res.cookie("token", token, {
-  httpOnly: true,
+  httpOnly: false,
   secure: true,
   sameSite: "none",
   domain: ".vercel.app",
