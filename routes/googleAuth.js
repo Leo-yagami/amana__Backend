@@ -34,7 +34,7 @@ googleAuthRoutes.get('/google/callback',
       //make sure donor doesn't exist
       let donor = await Donor.findOne({name: payload.name});
       if(donor){
-        return res.redirect(process.env.CLIENT_URL)
+        return res.redirect("https://amana--fullstack.vercel.app"  || process.env.CLIENT_URL)
       }
 
       const response = Donor.create(payload)
@@ -42,7 +42,7 @@ googleAuthRoutes.get('/google/callback',
       console.log(err)
     }
     // Redirect to frontend dashboard
-    res.redirect(process.env.CLIENT_URL);
+    res.redirect("https://amana--fullstack.vercel.app" ||process.env.CLIENT_URL);
   }
 );
 
