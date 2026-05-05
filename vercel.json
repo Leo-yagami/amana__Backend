@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "index.js"
     }
-  ]
+  ],
+  "rewrites": [{
+
+    "source": "/api/:path*",
+    "destination": "https://amana-bckend-api.vercel.app/api/:path*" 
+  }]
+  
 }
