@@ -321,6 +321,9 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes); // Mounts /api/auth/google
 
+app.get('/', (req,res)=>{
+  res.send("hello")
+})
 
 //Payment section
 app.get('/makePayment', (req, res) => {
