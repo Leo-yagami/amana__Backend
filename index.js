@@ -572,7 +572,7 @@ app.get('/api/support-history', async (req, res) =>{
   const {page = 1, limit = 50} = req.query;
   const id = req.query.familyId;
   try {
-    const response = await Support.find({familyId: id}).limit(limit * 1).skip((page - 1) * limit).populate("family")
+    const response = await Support.find({familyId: id}).limit(limit * 1).skip((page - 1) * limit).populate("familyId")
     console.log(response);
     res.status(201).json(response)
   } catch (err) {
