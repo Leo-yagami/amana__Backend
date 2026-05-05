@@ -282,7 +282,7 @@ app.use(cookieParser());
 
 // CORS: Allow frontend to send credentials (cookies)
 app.use(cors({
-  origin: process.env.CLIENT_URL, // e.g., http://localhost:8080
+  origin: "https://amana--fullstack.vercel.app", // e.g., http://localhost:8080
   credentials: true
 }));
 
