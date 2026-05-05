@@ -349,7 +349,7 @@ app.get('/initialize', async (req, res) => {
       "phone_number": paymentData.phone,
       "tx_ref": tx_ref,
       "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
-      "return_url": `http://localhost:3000/paymentComplete?tx_ref=${tx_ref}`,
+      "return_url": `${process.env.BACKEND_URL}/paymentComplete?tx_ref=${tx_ref}`,
     }
 };
 
@@ -460,7 +460,7 @@ app.get("/paymentComplete", (req, res) => {
 
           <script>
             ${receiptReference ? `window.open("https://chapa.link/payment-receipt/${receiptReference}", "_blank");` : ""}
-            window.location.href = "http://localhost:8080";
+            window.location.href = "${process.env.CLIENT_URL}";
           </script>
         </body>
       </html>
@@ -1366,4 +1366,9 @@ app.get('/api/dashboard/analytics', async (req, res)=>{
 })
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;
