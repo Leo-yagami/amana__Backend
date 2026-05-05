@@ -281,9 +281,16 @@ app.use(express.json());
 app.use(cookieParser());
 
 // CORS: Allow frontend to send credentials (cookies)
+// app.use(cors({
+//   origin: "https://amana--fullstack.vercel.app", // e.g., http://localhost:8080
+//   credentials: true
+// }));
+
 app.use(cors({
-  origin: "https://amana--fullstack.vercel.app", // e.g., http://localhost:8080
-  credentials: true
+  origin: "https://amana--fullstack.vercel.app",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 // Passport session middleware (required for OAuth flow)
@@ -303,6 +310,7 @@ app.use(passport.session());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes); // Mounts /api/auth/google
+
 
 //Payment section
 app.get('/makePayment', (req, res) => {
