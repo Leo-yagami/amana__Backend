@@ -271,10 +271,15 @@ const Donation = require('./models/Donations');
 
 const app = express();
 
-// Connect DB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.error(err));
+// // Connect DB
+// mongoose.connect(process.env.MONGO_URI)
+//   .then(() => console.log('MongoDB Connected'))
+//   .catch(err => console.error(err));
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 30000,
+})
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.error("MongoDB Connection Error:", err));
 
 // Middleware
 app.use(express.json());
