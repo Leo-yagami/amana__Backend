@@ -34,14 +34,17 @@ googleAuthRoutes.get('/google/callback',
       //make sure donor doesn't exist
       let donor = await Donor.findOne({name: payload.name});
       if(donor){
+        res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
         return res.redirect(process.env.CLIENT_URL)
       }
+
 
       const response = Donor.create(payload)
     } catch (err) {
       console.log(err)
     }
     // Redirect to frontend dashboard
+    res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
     res.redirect(process.env.CLIENT_URL);
   }
 );
