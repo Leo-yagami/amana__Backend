@@ -16,11 +16,11 @@ const generateToken = (res, userId,userName, userEmail) => {
   // });
 
   res.cookie("token", token, {
-  httpOnly: false,
-  secure: true,
-  sameSite: "none",
-  domain: ".vercel.app",
-  path: "/",
+  // httpOnly: false,
+  // secure: true,
+  // sameSite: "none",
+  // domain: ".vercel.app",
+  // path: "/",
 });
   
   return token;
