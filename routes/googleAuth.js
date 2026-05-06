@@ -35,16 +35,16 @@ googleAuthRoutes.get('/google/callback',
       let donor = await Donor.findOne({name: payload.name});
       if(donor){
         res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
-        // return res.redirect(process.env.CLIENT_URL)
-        return res.send(`
-  <html>
-    <body>
-      <script>
-        window.location.href = "${process.env.CLIENT_URL}";
-      </script>
-    </body>
-  </html>
-`);
+        return res.redirect(process.env.CLIENT_URL)
+//         return res.send(`
+//   <html>
+//     <body>
+//       <script>
+//         window.location.href = "${process.env.CLIENT_URL}";
+//       </script>
+//     </body>
+//   </html>
+// `);
       }
 
 
@@ -54,16 +54,16 @@ googleAuthRoutes.get('/google/callback',
     }
     // Redirect to frontend dashboard
     res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
-    // res.redirect(process.env.CLIENT_URL);
-    return res.send(`
-  <html>
-    <body>
-      <script>
-        window.location.href = "${process.env.CLIENT_URL}";
-      </script>
-    </body>
-  </html>
-`);
+    res.redirect(process.env.CLIENT_URL);
+//     return res.send(`
+//   <html>
+//     <body>
+//       <script>
+//         window.location.href = "${process.env.CLIENT_URL}";
+//       </script>
+//     </body>
+//   </html>
+// `);
   }
 );
 

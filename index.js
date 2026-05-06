@@ -309,8 +309,8 @@ app.use(async (req, res, next)=>{
 app.use(cors({
   origin: "https://amana--fullstack.vercel.app",
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  // methods: ["GET", "POST", "PUT", "DELETE"],
+  // allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 // Passport session middleware (required for OAuth flow)
