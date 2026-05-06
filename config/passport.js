@@ -7,7 +7,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: 'https://amana-bckend-api.vercel.app/api/auth/google/callback',
+      callbackURL: 'https://api-amana-fullstack.onrender.com/api/auth/google/callback',
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
