@@ -262,6 +262,7 @@ const Family = require('./models/Family')
 const Support = require('./models/Support')
 const Donor = require('./models/Donors')
 const Event = require('./models/Event')
+const connectToDatabase = require('./lib/db')
 
 require('./config/passport'); // Initialize passport config
 
@@ -271,19 +272,33 @@ const Donation = require('./models/Donations');
 
 const app = express();
 
-// // Connect DB
-// mongoose.connect(process.env.MONGO_URI)
-//   .then(() => console.log('MongoDB Connected'))
-//   .catch(err => console.error(err));
-mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 30000,
-})
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.error("MongoDB Connection Error:", err));
+// Connect DB
+// mongoose.connect(process.env.MONGO_URI, {
+//   serverSelectionTimeoutMS: 30000,
+// })
+// .then(() => console.log("MongoDB Connected"))
+// .catch(err => console.error("MongoDB Connection Error:", err));
+
+//initially connect to db too
+connectToDatabase()
+.then(()=>console.log("connected to database"))
+.catch(err=>console.log("COULDNT CONNECT: ", err))
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
+
+// DB connection middleware
+app.use(async (req, res, next)=>{
+  try {
+    await connectToDatabase;
+    next()
+    
+  } catch (error) {
+    console.log("ERROOOOOOOOOOR", error)
+    next()
+  }
+})
 
 // CORS: Allow frontend to send credentials (cookies)
 // app.use(cors({
