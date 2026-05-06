@@ -273,32 +273,32 @@ const Donation = require('./models/Donations');
 const app = express();
 
 // Connect DB
-// mongoose.connect(process.env.MONGO_URI, {
-//   serverSelectionTimeoutMS: 30000,
-// })
-// .then(() => console.log("MongoDB Connected"))
-// .catch(err => console.error("MongoDB Connection Error:", err));
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 30000,
+})
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.error("MongoDB Connection Error:", err));
 
 //initially connect to db too
-connectToDatabase()
-.then(()=>console.log("connected to database"))
-.catch(err=>console.log("COULDNT CONNECT: ", err))
+// connectToDatabase()
+// .then(()=>console.log("connected to database"))
+// .catch(err=>console.log("COULDNT CONNECT: ", err))
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
 
 // DB connection middleware
-app.use(async (req, res, next)=>{
-  try {
-    await connectToDatabase;
-    next()
+// app.use(async (req, res, next)=>{
+//   try {
+//     await connectToDatabase;
+//     next()
     
-  } catch (error) {
-    console.log("ERROOOOOOOOOOR", error)
-    next()
-  }
-})
+//   } catch (error) {
+//     console.log("ERROOOOOOOOOOR", error)
+//     next()
+//   }
+// })
 
 // CORS: Allow frontend to send credentials (cookies)
 // app.use(cors({
