@@ -422,7 +422,7 @@ app.get('/api/initialize', async (req, res) => {
       "tx_ref": tx_ref,
       "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
       // "return_url": `http://localhost:3000/paymentComplete?tx_ref=${tx_ref}`,
-      "return_url": `https://api-amana-fullstack.onrender.com/api/paymentComplete?tx_ref=${tx_ref}`,
+      "return_url": `https://api-amana-fullstack.onrender.com/paymentComplete?tx_ref=${tx_ref}`,
     }
 };
 
