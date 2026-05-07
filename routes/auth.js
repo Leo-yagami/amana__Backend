@@ -78,6 +78,7 @@ router.post('/logout', (req, res) => {
 // @route   GET /api/auth/me
 // @desc    Get current user (used by React to rehydrate state)
 router.get('/me', protect, async (req, res) => {
+
   res.json({
     _id: req.user._id,
     name: req.user.name,
