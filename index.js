@@ -272,6 +272,8 @@ const Donation = require('./models/Donations');
 
 const app = express();
 
+
+app.set("trust proxy", 1);
 // Connect DB
 mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 30000,
@@ -341,7 +343,7 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes); // Mounts /api/auth/google
 
-app.set("trust proxy", 1);
+
 
 app.get('/', (req,res)=>{
   res.send("hello")
