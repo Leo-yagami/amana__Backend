@@ -339,13 +339,13 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     //developement
+    secure: false,
+    //production
     // secure: false,
     //production
-    secure: true,
-    //production
-    sameSite: "none",
+    // sameSite: "none",
     //development
-    // sameSite: "lax",
+    sameSite: "lax",
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
