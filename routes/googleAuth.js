@@ -16,7 +16,7 @@ googleAuthRoutes.get('/google',
 googleAuthRoutes.get('/google/callback',
   passport.authenticate('google', { 
     failureRedirect: '/login?error=google_failed',
-    session: false // We use JWT, not sessions
+    session: true // We use JWT, not sessions
   }),
   async (req, res) => {
     // Generate JWT and set HttpOnly cookie
@@ -49,7 +49,7 @@ googleAuthRoutes.get('/google/callback',
       }
 
 
-      const response = Donor.create(payload)
+      const response = await Donor.create(payload)
     } catch (err) {
       console.log(err)
     }
