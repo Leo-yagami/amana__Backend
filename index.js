@@ -307,12 +307,34 @@ app.use(cookieParser());
 // }));
 
 //for production
+// app.use(cors({
+//   origin: "https://amana--fullstack.vercel.app",
+//   credentials: true,
+//   // methods: ["GET", "POST", "PUT", "DELETE"],
+//   // allowedHeaders: ["Content-Type", "Authorization"],
+// }));
+// Replace your current cors() call with this
 app.use(cors({
-  origin: "https://amana--fullstack.vercel.app",
+  origin: (origin, callback) => {
+    const allowed = [
+      "https://amana--fullstack.vercel.app",
+      "http://localhost:8080",
+      "http://localhost:5173",
+    ];
+    // allow requests with no origin (Postman, curl, server-to-server)
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
   credentials: true,
-  // methods: ["GET", "POST", "PUT", "DELETE"],
-  // allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Explicitly handle preflight for all routes
+app.options("*", cors());
+
+
 
 //for development
 // app.use(cors({
