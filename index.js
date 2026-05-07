@@ -332,7 +332,7 @@ app.use(cors({
 }));
 
 // Explicitly handle preflight for all routes
-// app.options("(.*)", cors());
+app.options("(.*)", cors());
 
 
 
