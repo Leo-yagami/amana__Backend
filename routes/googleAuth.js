@@ -16,7 +16,7 @@ googleAuthRoutes.get('/google',
 googleAuthRoutes.get('/google/callback',
   passport.authenticate('google', { 
     failureRedirect: '/login?error=google_failed',
-    session: true // We use JWT, not sessions
+    session: false // We use JWT, not sessions
   }),
   async (req, res) => {
     // Generate JWT and set HttpOnly cookie
@@ -35,7 +35,6 @@ googleAuthRoutes.get('/google/callback',
       let donor = await Donor.findOne({name: payload.name});
       if(donor){
         res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
-        // return res.redirect('http://localhost:8080')
         return res.redirect(process.env.CLIENT_URL)
 //         return res.send(`
 //   <html>
@@ -49,13 +48,12 @@ googleAuthRoutes.get('/google/callback',
       }
 
 
-      const response = await Donor.create(payload)
+      const response = Donor.create(payload)
     } catch (err) {
       console.log(err)
     }
     // Redirect to frontend dashboard
     res.setHeader("Set-Cookie", res.getHeader("Set-Cookie"));
-    // res.redirect('http://localhost:8080');
     res.redirect(process.env.CLIENT_URL);
 //     return res.send(`
 //   <html>
