@@ -328,11 +328,16 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  // cookie: {
+  //   secure: true,
+  //   sameSite: "none",
+  //   maxAge: 24 * 60 * 60 * 1000
+  // }
   cookie: {
-    secure: true,
-    sameSite: "none",
-    maxAge: 24 * 60 * 60 * 1000
-  }
+  secure: process.env.NODE_ENV === "production", // true in production → only send over HTTPS
+  sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax", // only "none" when secure=true
+  maxAge: 24 * 60 * 60 * 1000
+}
 }));
 
 app.use(passport.initialize());
@@ -342,12 +347,13 @@ app.use(passport.session());
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes); // Mounts /api/auth/google
 
-app.get('/', (req,res)=>{
+app.get('/api', (req,res)=>{
+  console.log("root")
   res.send("hello")
 })
 
 //Payment section
-app.get('/makePayment', (req, res) => {
+app.get('/api/makePayment', (req, res) => {
   res.send(`<a href="/initialize">Donate</a>`)
 })
 
@@ -356,14 +362,14 @@ app.get('/makePayment', (req, res) => {
 //   console.log(body)
 // })
 
-app.post("/initialize", (req, res) => {
+app.post("/api/initialize", (req, res) => {
   const paymentInfo = {paymentMethod: req.body.paymentMethod, amount: req.body.selectedAmount || req.body.customAmount * 1, phone: req.body.telebirrPhone}
   req.session.paymentData = paymentInfo
 
   return res.json({ message: "received", body: req.body });
 });
 
-app.get('/initialize', async (req, res) => {
+app.get('/api/initialize', async (req, res) => {
   const tx_ref = "tx-" + Date.now(); // unique reference
   const paymentData = req.session.paymentData;
   if (!paymentData) {
@@ -454,7 +460,7 @@ app.get('/initialize', async (req, res) => {
   });
 })
 
-app.get("/paymentComplete", (req, res) => {
+app.get("/api/paymentComplete", (req, res) => {
   const request = require("request");
 
   const tx_ref = req.query.tx_ref;
