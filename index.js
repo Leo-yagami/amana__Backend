@@ -580,7 +580,7 @@ app.put('/api/families/:id', async (req, res) => {
   else{
     req.body.registrationStatus = "incomplete"
   }
-,
+
   try{
     const response = await Family.findByIdAndUpdate({_id: id}, req.body)
     res.status(201).json(response);
