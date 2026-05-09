@@ -27,13 +27,14 @@ router.post('/register', async (req, res) => {
       authType: 'local'
     });
 
-    generateToken(res, user._id);
+    const token = generateToken(res, user._id);
     
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      authType: user.authType
+      authType: user.authType,
+      token
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -49,13 +50,14 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     
     if (user && (await bcrypt.compare(password, user.password))) {
-      generateToken(res, user._id);
+      const token = generateToken(res, user._id);
       
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
-        authType: user.authType
+        authType: user.authType,
+        token
       });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });

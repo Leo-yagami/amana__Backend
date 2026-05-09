@@ -79,7 +79,7 @@ googleAuthRoutes.post('/exchange', (req, res) => {
   handoffStore.delete(code);
 
   // Set the HttpOnly JWT cookie (same generateToken you already use)
-  generateToken(res, record.userId, record.userName, record.userEmail);
+  const token = generateToken(res, record.userId, record.userName, record.userEmail);
 
   return res.status(200).json({
     message: 'ok',
@@ -88,6 +88,7 @@ googleAuthRoutes.post('/exchange', (req, res) => {
       name: record.userName,
       email: record.userEmail,
     },
+    token
   });
 });
 
