@@ -328,16 +328,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  // cookie: {
-  //   secure: true,
-  //   sameSite: "none",
-  //   maxAge: 24 * 60 * 60 * 1000
-  // }
   cookie: {
-  secure: process.env.NODE_ENV === "production", // true in production → only send over HTTPS
-  sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax", // only "none" when secure=true
-  maxAge: 24 * 60 * 60 * 1000
-}
+    secure: true,
+    sameSite: "none",
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 app.use(passport.initialize());
@@ -362,57 +357,58 @@ app.get('/api/makePayment', (req, res) => {
 //   console.log(body)
 // })
 
-app.post("/api/initialize", (req, res) => {
-  const paymentInfo = {paymentMethod: req.body.paymentMethod, amount: req.body.selectedAmount || req.body.customAmount * 1, phone: req.body.telebirrPhone}
-  req.session.paymentData = paymentInfo
-
-  return res.json({ message: "received", body: req.body });
-});
-
-app.get('/api/initialize', async (req, res) => {
+app.post("/api/initialize", async (req, res) => {
   const tx_ref = "tx-" + Date.now(); // unique reference
-  const paymentData = req.session.paymentData;
-  if (!paymentData) {
-    return res.status(400).json({ message: "No payment data found. Submit form first." });
-  }
-  const token = req.cookies.token
-  if(!token) return res.status(401).json({message: "not logged in"})
+  
+  const paymentInfo = {
+    paymentMethod: req.body.paymentMethod, 
+    amount: req.body.selectedAmount || req.body.customAmount * 1, 
+    phone: req.body.telebirrPhone
+  };
 
-  const decoded = jwt.verify(token,process.env.JWT_SECRET);
-  console.log(decoded)
+  let token = req.cookies.token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if(!token) return res.status(401).json({message: "not logged in"});
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({message: "invalid token"});
+  }
 
   //options object
   let options = {
     'method': 'POST',
     'url': 'https://api.chapa.co/v1/transaction/initialize',
     'headers': {
-  'Authorization': 'Bearer CHASECK_TEST-gubJD4pSW7a1AXSMeWRJWm08aU2nGju6',
-  'Content-Type': 'application/json'
+      'Authorization': 'Bearer CHASECK_TEST-gubJD4pSW7a1AXSMeWRJWm08aU2nGju6',
+      'Content-Type': 'application/json'
     },
     body: {
-      "amount": paymentData.amount,
+      "amount": paymentInfo.amount,
       "currency": "ETB",
       "email": decoded.userEmail,
       "first_name": decoded.userName,
-      "phone_number": paymentData.phone,
+      "phone_number": paymentInfo.phone,
       "tx_ref": tx_ref,
       "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
-      "return_url": `${process.env.BACKEND_URL}/paymentComplete?tx_ref=${tx_ref}`,
+      "return_url": `${process.env.BACKEND_URL}/api/paymentComplete?tx_ref=${tx_ref}`,
     }
-};
-
+  };
 
   //initialize transaction payload and save number to update donor entity
   let transactionPayload = {
     donorId: "",
     donorName: decoded.userName,
     donationType: "monetary",
-    amount: paymentData.amount,
+    amount: paymentInfo.amount,
     currency: options.body.currency,
     donationReference: "",
   }
-  //clearing the session after assigning
-  req.session.paymentData = null;
 
   try{
     //get donor info through first name and update its phone number
@@ -420,12 +416,9 @@ app.get('/api/initialize', async (req, res) => {
     if (!preResponse) {
       return res.status(404).json({ message: "Donor not found" });
     }
-     
-    // console.log(preResponse);
 
     //create a donation with the payload + preResponse information
     transactionPayload.donorId = preResponse._id;
-    // transactionPayload.donationReference =`DON-${ transactionPayload.donorId.toString().slice(4,11)}`;
 
     const response = await Donation.create(transactionPayload);
     const {_id} = response;
@@ -433,32 +426,33 @@ app.get('/api/initialize', async (req, res) => {
     transactionPayload.donationReference = `DON-${_id.toString().slice(4,11)}`;
 
     const resp = await Donation.findByIdAndUpdate({_id: _id}, {donationReference: transactionPayload.donationReference});
-    console.log("PAYLOAD", transactionPayload)
 
     const response2 = await Donor.findOneAndUpdate({_id: transactionPayload.donorId},{
       $inc: {donationCount: 1, totalDonated: transactionPayload.amount},
       $push: {donations: resp}
     }, {new: true})
-    console.log(response2)
     
     await Transaction.createFromPayload(options.body);
   } catch (err) {
     console.log("Failed to make the transaction", err)
   }
+  
   options.body = JSON.stringify(options.body)
-  // console.log(options)
   
   request(options, function (error, response) {
-    if (error) throw new Error(error);
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "failed" });
+    }
     const parsed = JSON.parse(response.body);
 
     if (!parsed?.data?.checkout_url) {
       console.log("CHAPA ERROR:", parsed);
       return res.status(400).json(parsed);
     }
-    return res.redirect(parsed.data.checkout_url);
+    return res.json({ message: "ok", checkout_url: parsed.data.checkout_url });
   });
-})
+});
 
 app.get("/api/paymentComplete", (req, res) => {
   const request = require("request");
@@ -586,7 +580,7 @@ app.put('/api/families/:id', async (req, res) => {
   else{
     req.body.registrationStatus = "incomplete"
   }
-
+,
   try{
     const response = await Family.findByIdAndUpdate({_id: id}, req.body)
     res.status(201).json(response);
