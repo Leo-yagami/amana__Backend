@@ -380,6 +380,8 @@ app.post("/api/initialize", async (req, res) => {
     return res.status(401).json({message: "invalid token"});
   }
 
+  const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get("host")}`;
+
   //options object
   let options = {
     'method': 'POST',
@@ -396,7 +398,7 @@ app.post("/api/initialize", async (req, res) => {
       "phone_number": paymentInfo.phone,
       "tx_ref": tx_ref,
       "callback_url": "https://webhook.site/077164d6-29cb-40df-ba29-8a00e59a7e60",
-      "return_url": `${process.env.BACKEND_URL}/api/paymentComplete?tx_ref=${tx_ref}`,
+      "return_url": `${backendUrl}/api/paymentComplete?tx_ref=${tx_ref}`,
     }
   };
 
