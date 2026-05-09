@@ -437,6 +437,7 @@ app.post("/api/initialize", async (req, res) => {
     await Transaction.createFromPayload(options.body);
   } catch (err) {
     console.log("Failed to make the transaction", err)
+    return res.status(400).json({message: "Failed to create donation record", error: err})
   }
   
   options.body = JSON.stringify(options.body)
@@ -754,7 +755,7 @@ app.get('/api/donations', async (req, res)=> {
   }
   try {
     const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit)
-    // console.log(response)
+    console.log(response)
     res.send(response)
     // res.end()
   } catch (err) {
