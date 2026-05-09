@@ -366,7 +366,7 @@ app.post("/api/initialize", async (req, res) => {
     phone: req.body.telebirrPhone
   };
 
-  let token = req.cookies.token;
+  let token = null;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
