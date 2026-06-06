@@ -3,35 +3,51 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const { protect } = require('../middleware/authMiddleware');
+const Donor = require('../models/Donors')
 
 const router = express.Router();
 
 // @route   POST /api/auth/register
 // @desc    Register new user
-router.post('/register', async (req, res) => {
+router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const {fullName, email, password } = req.body;
 
     const userExists = await User.findOne({ email });
+
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
+
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const user = await User.create({
-      name,
+      name: fullName,
       email,
       password: hashedPassword,
       authType: 'local'
     });
 
-    const token = generateToken(res, user._id);
+    // Create / find Donor record 
+    const payload = {
+      name: user.name,
+      email: user.email,
+      donorType: 'Individual',
+      notes: 'logged in from sign up page'
+    };
+
+    let donor = await Donor.findOne({ name: payload.name });
+    if (!donor) {
+      await Donor.create(payload);
+    }
+
+    const token = generateToken(res, user._id, user.name, user.email);
     
     res.status(201).json({
       _id: user._id,
-      name: user.name,
+      fullName: user.name,
       email: user.email,
       authType: user.authType,
       token
@@ -50,11 +66,11 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     
     if (user && (await bcrypt.compare(password, user.password))) {
-      const token = generateToken(res, user._id);
+      const token = generateToken(res, user._id, user.name, user.email);
       
       res.json({
         _id: user._id,
-        name: user.name,
+        fullName: user.name,
         email: user.email,
         authType: user.authType,
         token
@@ -83,7 +99,7 @@ router.get('/me', protect, async (req, res) => {
   console.log("MEEEEEEEEEEEEEEEE")
   res.json({
     _id: req.user._id,
-    name: req.user.name,
+    fullName: req.user.name,
     email: req.user.email,
     authType: req.user.authType,
     avatar: req.user.avatar

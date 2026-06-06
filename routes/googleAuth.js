@@ -30,7 +30,7 @@ googleAuthRoutes.get('/google/callback',
         name: req.user.name,
         email: req.user.email,
         donorType: 'Individual',
-        notes: 'logged in from google yippie! + Amir is Gay'
+        notes: 'logged in from google!'
       };
 
       let donor = await Donor.findOne({ name: payload.name });
@@ -52,7 +52,8 @@ googleAuthRoutes.get('/google/callback',
       // ── 3. Redirect to the frontend callback page with the code ──
       // Do NOT set a cookie here — let the frontend exchange the code
       // via fetch(), so the cookie ends up in the correct browser partition.
-      const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?code=${code}`;
+      const redirectUrl = `${process.env.NODE_ENV === "development" ?"http://localhost:8080" : process.env.CLIENT_URL}/auth/callback?code=${code}`;
+
       return res.redirect(redirectUrl);
 
     } catch (err) {

@@ -307,6 +307,13 @@ app.use(cookieParser());
 //   credentials: true
 // }));
 
+process.env.NODE_ENV === "development"? 
+app.use(cors({
+  origin: "http://localhost:8080",
+  credentials: true,
+  // methods: ["GET", "POST", "PUT", "DELETE"],
+  // allowedHeaders: ["Content-Type", "Authorization"],
+})) :
 app.use(cors({
   origin: "https://amana--fullstack.vercel.app",
   credentials: true,
@@ -346,6 +353,10 @@ app.get('/api', (req,res)=>{
   console.log("root")
   res.send("hello")
 })
+app.get('/', (req,res)=>{
+  console.log("root")
+  res.send("hello")
+})
 
 //Payment section
 app.get('/api/makePayment', (req, res) => {
@@ -376,6 +387,7 @@ app.post("/api/initialize", async (req, res) => {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log(decoded)
   } catch (err) {
     return res.status(401).json({message: "invalid token"});
   }
@@ -484,7 +496,6 @@ app.get("/api/paymentComplete", (req, res) => {
     console.log("VERIFY RESPONSE:", data);
 
     const receiptReference = data.data.reference;
-
       //update transfer reference value
     try{
         await Transaction.updateAfterVerification(tx_ref, data.data);
@@ -505,7 +516,7 @@ app.get("/api/paymentComplete", (req, res) => {
 
           <script>
             ${receiptReference ? `window.open("https://chapa.link/payment-receipt/${receiptReference}", "_blank");` : ""}
-            window.location.href = "${process.env.CLIENT_URL}";
+            window.location.href = "${process.NODE_ENV === "production" ? process.env.CLIENT_URL : 'http://localhost:8080'}";
           </script>
         </body>
       </html>
@@ -754,7 +765,7 @@ app.get('/api/donations', async (req, res)=> {
     searchQuery.donationType = donationType
   }
   try {
-    const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit)
+    const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit).sort('-receivedAt')
     console.log(response)
     res.send(response)
     // res.end()
