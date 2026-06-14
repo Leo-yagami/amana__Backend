@@ -537,38 +537,79 @@ app.post('/api/families', async (req, res) => {
   }
 })
 app.get('/api/families', async (req, res) => {
+  // console.log(req.query)
+  let {page = 1, limit = 10, search= '', registrationStatus, urgencyLevel, registrationCompleted} = req.query;
+  limit = limit - 0;
+  page = page - 0;
+  const skip = (page - 1) * limit;
+
+  const searchQuery = {}
+  //conditionally setting the search
+  if(search){
+      searchQuery.$or = [
+        {familyName: {$regex: search, $options: 'i'}},
+        {familyCode: {$regex: search, $options: 'i'}},
+        {familyHead: {$regex: search, $options: 'i'}}
+      ]
+  }
+
+  //conditionally setting the registrationStatus
+  if(registrationStatus){
+    searchQuery.registrationStatus = registrationStatus;
+  }
+
+  //conditionally setting the urgency level
+  if(urgencyLevel){
+    searchQuery.urgencyLevel = urgencyLevel;
+  }
+
+  //conditionally setting the completion of registration
+  if(registrationCompleted){
+    searchQuery.registrationCompleted = registrationCompleted === 'true'
+  }
+
   try{
-    // console.log(req.query)
-    const {page = 1, limit = 10, search= '', registrationStatus, urgencyLevel, registrationCompleted} = req.query;
-    const searchQuery = {}
 
-    //conditionally setting the search
-    if(search){
-        searchQuery.$or = [
-          {familyName: {$regex: search, $options: 'i'}},
-          {familyCode: {$regex: search, $options: 'i'}},
-          {familyHead: {$regex: search, $options: 'i'}}
-        ]
-    }
+    // const response = await Family.find(searchQuery).limit(limit * 1).skip((page - 1) * limit);
 
-    //conditionally setting the registrationStatus
-    if(registrationStatus){
-      searchQuery.registrationStatus = registrationStatus;
-    }
+    const result = await Family.aggregate([
+      //stage 1: matching
+      {$match: searchQuery},
+      {
+        $facet: {
+          metadata: [{$count: "totalRecords"}],
+          data: [
+            {$sort: {createdAt: -1}},
+            {$skip: skip},
+            {$limit: limit}
+          ]
+        }
+      },
+      //stage 3: reshape output 
+      {
+        $project: {
+          data: 1,
+          //extract total records from metadata array and compute pages
+          pagination: {
+            page: {$literal: page},
+            limit: {$literal: limit},
+            total: {$arrayElemAt: ["$metadata.totalRecords", 0]},
+            totalPages: {
+              $ceil: {
+                $divide: [
+                  {$ifNull: [{ $arrayElemAt: ["$metadata.totalRecords", 0]}, 0]},
+                  limit
+                ]
+              }
+            }
+          }
+        }
+      }
+    ])
 
-    //conditionally setting the urgency level
-    if(urgencyLevel){
-      searchQuery.urgencyLevel = urgencyLevel;
-    }
 
-    //conditionally setting the completion of registration
-    if(registrationCompleted){
-      searchQuery.registrationCompleted = registrationCompleted === 'true'
-    }
-
-    const response = await Family.find(searchQuery).limit(limit * 1).skip((page - 1) * limit);
     // console.log("response", response)
-    res.send(response)
+    res.send(result)
   }catch(err){
     console.log("Failed to register family", err)
     res.end()
@@ -640,7 +681,10 @@ app.get('/api/support-history', async (req, res) =>{
 //donors page
 app.get('/api/donors', async (req, res)=> {
   // console.log(req.query);
-  const {donorType, page = 1, limit = 12, search = ''} = req.query;
+  let {donorType, page, limit, search = ''} = req.query;
+  limit = limit - 0;
+  page = page - 0;
+  const skip = (page - 1) * limit;
   let searchQuery = {}
   if(search){
     searchQuery = {name: {$regex: search, $options: 'i'}}
@@ -649,9 +693,45 @@ app.get('/api/donors', async (req, res)=> {
     searchQuery.donorType = donorType
   }
   try {
-    const response = await Donor.find(searchQuery).limit(limit * 1).skip((page - 1) * limit)
+    // const response = await Donor.find(searchQuery).limit(limit * 1).skip((page - 1) * limit)
+        const result = await Donor.aggregate([
+      //stage 1: matching
+      {$match: searchQuery},
+      {
+        $facet: {
+          metadata: [{$count: "totalRecords"}],
+          data: [
+            {$sort: {registeredAt: -1}},
+            {$skip: skip},
+            {$limit: limit}
+          ]
+        }
+      },
+      //stage 3: reshape output 
+      {
+        $project: {
+          data: 1,
+          //extract total records from metadata array and compute pages
+          pagination: {
+            page: {$literal: page},
+            limit: {$literal: limit},
+            total: {$arrayElemAt: ["$metadata.totalRecords", 0]},
+            totalPages: {
+              $ceil: {
+                $divide: [
+                  {$ifNull: [{ $arrayElemAt: ["$metadata.totalRecords", 0]}, 0]},
+                  limit
+                ]
+              }
+            }
+          }
+        }
+      }
+    ])
     // console.log(response);
-    res.json(response)
+    // res.json(response)
+    console.log(result)
+    res.json(result)
   } catch (err) {
     console.error(err)
     res.end()
@@ -727,7 +807,7 @@ app.post('/api/donations/', async (req, res)=>{
     // const preResponse = await Donor.findOne({_id: req.body.donorId})
     const response = await Donation.create(req.body);
     const {_id} = response;
-    console.log(response)
+    // console.log(response)
     await Donation.findByIdAndUpdate({_id: _id}, {donationReference: `DON-${(_id.toString()).slice(4,11)}`})
 
     req.body.id = response._id;
@@ -743,7 +823,7 @@ app.post('/api/donations/', async (req, res)=>{
       $inc: {"_count.donation": 1, collectedAmount: req.body.amount},
     })
     // console.log("response", response)
-    console.log("response for donors update", response2)
+    // console.log("response for donors update", response2)
     res.end()
   } catch (err) {
     console.error(err)
@@ -752,8 +832,11 @@ app.post('/api/donations/', async (req, res)=>{
 })
 
 app.get('/api/donations', async (req, res)=> {
-  // console.log(req.query);
-  const {search = '', page=1, limit=50, status, donationType} = req.query;
+  console.log(req.query);
+  let {search = '', page, limit, status, donationType} = req.query;
+  limit= limit - 0;
+  page= page - 0;
+  const skip = (page - 1) * limit;
   let searchQuery = {};
   if(search){
     searchQuery = {donorName: {$regex: search, $options: 'i'}}
@@ -765,12 +848,47 @@ app.get('/api/donations', async (req, res)=> {
     searchQuery.donationType = donationType
   }
   try {
-    const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit).sort('-receivedAt')
-    console.log(response)
-    res.send(response)
+    // const response = await Donation.find(searchQuery).limit(limit).skip((page - 1) * limit).sort('-receivedAt')
+    const result = await Donation.aggregate([
+      //stage 1: matching
+      {$match: searchQuery},
+      {
+        $facet: {
+          metadata: [{$count: "totalRecords"}],
+          data: [
+            {$sort: {receivedAt: -1}},
+            {$skip: skip},
+            {$limit: limit}
+          ]
+        }
+      },
+      //stage 3: reshape output 
+      {
+        $project: {
+          data: 1,
+          //extract total records from metadata array and compute pages
+          pagination: {
+            page: {$literal: page},
+            limit: {$literal: limit},
+            total: {$arrayElemAt: ["$metadata.totalRecords", 0]},
+            totalPages: {
+              $ceil: {
+                $divide: [
+                  {$ifNull: [{ $arrayElemAt: ["$metadata.totalRecords", 0]}, 0]},
+                  limit
+                ]
+              }
+            }
+          }
+        }
+      }
+    ])
+    // console.log(response)
+    // console.log(result)
+    res.send(result)
     // res.end()
   } catch (err) {
-    console.log(err)
+    // console.log(err)
     res.end()
   }
 })
@@ -841,8 +959,8 @@ app.get('/api/donations/:id', async (req, res)=>{
   const id = req.params.id;
   try {
     const response = await Donation.findById({_id: id})
-    // console.log("RESPOOOOOOOOOOOOOOOOONSE", response)
-    res.send(response)
+    console.log("RESPOOOOOOOOOOOOOOOOONSE", response)
+    res.json(response)
   } catch (err) {
     console.log(err)
     res.end()
@@ -852,27 +970,52 @@ app.get('/api/donations/:id', async (req, res)=>{
 app.put('/api/donations/:id', async (req, res)=> {
   const id = req.params.id;
   try {
+    const oldDonation = await Donation.findById(id);
     const updatedDonation = await Donation.findByIdAndUpdate({_id: id}, req.body, {new: true})
-    const donorId = updatedDonation.donorId;
-    // console.log(updatedDonation)
-    const donorInfo = await Donor.findOne({_id: donorId});
-    console.log(donorInfo)
-    const index = donorInfo.donations.findIndex(i => (i.id || i._id).toString() === id);
-    if(index !== -1){
-      donorInfo.donations[index] = updatedDonation;
-      console.log("INDEX",index)
+
+// ---- after you have `updatedDonation` ----
+    const newEventId = updatedDonation.eventId?.toString();
+    const oldEventId = oldDonation.eventId?.toString();
+
+    // If the event reference changed, pull from old
+    if (oldEventId && oldEventId !== newEventId) {
+      await Event.findByIdAndUpdate(oldEventId, {
+        $pull: { donations: id },
+        $inc: { collectedAmount: -oldDonation.amount, "_count.donation": -1 },
+      });
     }
-    // donorInfo.donations.map(donation=>{
-    //   if(donation.id === id) return donation = updatedDonation
-    //   else return donation
-    // })
-    const newTotal = donorInfo.donations.reduce((total,donation)=>{
-      return total+=(donation.amount * 1);
-    }, 0)
-    console.log(newTotal)
-    donorInfo.totalDonated = newTotal;
-    const finalDonor = await Donor.findByIdAndUpdate({_id: donorId}, donorInfo, {new: true})
-    console.log(finalDonor);
+    // Update new event
+    if (newEventId) {
+      const amountDelta = (updatedDonation.amount || 0) - (oldDonation.amount || 0);
+      await Event.findByIdAndUpdate(newEventId, {
+        $addToSet: { donations: id },
+        $inc: { collectedAmount: amountDelta, "_count.donation": oldEventId === newEventId? 0 : 1 }
+      });
+    }
+
+// Handle donor updates
+    const oldDonorId = oldDonation.donorId?.toString();
+    const newDonorId = updatedDonation.donorId?.toString();
+    if (oldDonorId !== newDonorId) {
+      // Move donation between donors
+      // Move donation between donors using atomic updates only
+      await Donor.findByIdAndUpdate(oldDonorId, {
+        $pull: { donations: { _id: id } },
+        $inc: { donationCount: -1, totalDonated: -oldDonation.amount }
+      });
+      await Donor.findByIdAndUpdate(newDonorId, {
+        $push: { donations: updatedDonation },
+        $inc: { donationCount: 1, totalDonated: updatedDonation.amount }
+      });
+    } else {
+      // Update donation within same donor
+      const amountDelta = (updatedDonation.amount || 0) - (oldDonation.amount || 0);
+      await Donor.findByIdAndUpdate(oldDonorId, {
+        $set: { "donations.$[elem]": updatedDonation },
+        $inc: { totalDonated: amountDelta }
+      }, { arrayFilters: [{ "elem._id": id }] });
+    }
+
     res.end();
   } catch (err) {
     console.log(err)
@@ -1094,8 +1237,11 @@ app.post('/api/events', async (req, res)=> {
 })
 
 app.get('/api/events', async (req, res)=> {
-  console.log(req.query)
-  const {page = 1, limit = 10, search = '', status, eventType} = req.query;
+  // console.log(req.query)
+  let {page, limit, search = '', status, eventType} = req.query;
+  limit = limit - 0;
+  page = page - 0;
+  const skip = (page - 1) * limit;
 
   let searchQuery = {};
   if(search){
@@ -1119,8 +1265,44 @@ app.get('/api/events', async (req, res)=> {
   
 
   try {
-    const response = await Event.find(searchQuery).limit(limit).skip((page - 1) * limit);
-    res.send(response)
+    // const response = await Event.find(searchQuery).limit(limit).skip((page - 1) * limit);
+
+    const result = await Event.aggregate([
+      //stage 1: matching
+      {$match: searchQuery},
+      {
+        $facet: {
+          metadata: [{$count: "totalRecords"}],
+          data: [
+            {$sort: {eventDate: -1}},
+            {$skip: skip},
+            {$limit: limit}
+          ]
+        }
+      },
+      //stage 3: reshape output 
+      {
+        $project: {
+          data: 1,
+          //extract total records from metadata array and compute pages
+          pagination: {
+            page: {$literal: page},
+            limit: {$literal: limit},
+            total: {$arrayElemAt: ["$metadata.totalRecords", 0]},
+            totalPages: {
+              $ceil: {
+                $divide: [
+                  {$ifNull: [{ $arrayElemAt: ["$metadata.totalRecords", 0]}, 0]},
+                  limit
+                ]
+              }
+            }
+          }
+        }
+      }
+    ])
+
+    res.send(result)
   } catch (err) {
     console.log(err)
     res.end()
@@ -1188,6 +1370,7 @@ app.get('/api/events/:id', async (req, res)=>{
   const {id} = req.params;
   try {
     const response = await Event.findOne({_id: id}).populate([{path: "supportHistory", populate: [{path: "familyId"},{path: "donorId"}]}, {path: "donations"}]);
+    console.log(response)
     res.send(response)
   } catch (err) {
     console.log(err)
