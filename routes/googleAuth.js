@@ -11,7 +11,7 @@ const googleAuthRoutes = express.Router();
 // "undefined/auth/callback".
 function getClientUrl() {
   if (process.env.NODE_ENV === "development") return "http://localhost:8080";
-  return process.env.CLIENT_URL || "https://amana--fullstack.vercel.app";
+  return "https://amana--fullstack.vercel.app" || process.env.CLIENT_URL ;
 }
 
 // ── Temporary in-memory store for one-time handoff codes ──
