@@ -6,6 +6,14 @@ const Donor = require('../models/Donors')
 
 const googleAuthRoutes = express.Router();
 
+// Frontend origin the OAuth handoff redirects back to. CLIENT_URL must be set
+// on the prod backend; fall back to the known deployment to avoid
+// "undefined/auth/callback".
+function getClientUrl() {
+  if (process.env.NODE_ENV === "development") return "http://localhost:8080";
+  return process.env.CLIENT_URL || "https://amana--fullstack.vercel.app";
+}
+
 // ── Temporary in-memory store for one-time handoff codes ──
 // In production you could use Redis; a Map with TTL is fine for moderate traffic.
 const handoffStore = new Map();
@@ -53,13 +61,13 @@ googleAuthRoutes.get('/google/callback',
       // ── 3. Redirect to the frontend callback page with the code ──
       // Do NOT set a cookie here — let the frontend exchange the code
       // via fetch(), so the cookie ends up in the correct browser partition.
-      const redirectUrl = `${process.env.NODE_ENV === "development" ?"http://localhost:8080" : process.env.CLIENT_URL}/auth/callback?code=${code}`;
+      const redirectUrl = `${getClientUrl()}/auth/callback?code=${code}`;
 
       return res.redirect(redirectUrl);
 
     } catch (err) {
       console.error('Google callback error:', err);
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=google_callback_failed`);
+      return res.redirect(`${getClientUrl()}/login?error=google_callback_failed`);
     }
   }
 );
