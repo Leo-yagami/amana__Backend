@@ -70,6 +70,25 @@ const transactionSchema = new mongoose.Schema(
       default: 'pending',
     },
 
+    // References for donation creation after verification
+    donorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Donor',
+      default: null,
+    },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Event',
+      default: null,
+    },
+
+    // Family classification the donation is earmarked for (null = general fund)
+    familyClassification: {
+      type: String,
+      enum: ['orphan', 'disabled_disease', 'old_age', 'single_mother'],
+      default: null,
+    },
+
     // Verification details
     verified_at: {
       type: Date,
@@ -110,6 +129,9 @@ transactionSchema.statics.createFromPayload = async function (payload) {
     phone_number: payload.phone_number,
     callback_url: payload.callback_url,
     return_url: payload.return_url,
+    donorId: payload.donorId || null,
+    eventId: (payload.eventId && mongoose.Types.ObjectId.isValid(payload.eventId)) ? payload.eventId : null,
+    familyClassification: payload.familyClassification || null,
     status: 'pending',
   });
 };

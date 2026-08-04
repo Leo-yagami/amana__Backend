@@ -49,6 +49,30 @@ const donationSchema = new mongoose.Schema(
       // required: true,
       trim: true,
       default: "",
+      unique: true,
+      sparse: true, // allows empty/duplicate "" values but enforces uniqueness when provided
+    },
+
+    // Where the donation originated: "chapa" (online payment) or "manual" (staff entry).
+    // Used by the frontend to lock Chapa donations from editing.
+    source: {
+      type: String,
+      enum: ["chapa", "manual"],
+      default: "manual",
+    },
+
+    // Chapa transaction reference (tx-...). Links a Chapa donation back to its
+    // Transaction record so the internal receipt can be rendered from the
+    // stored verification data. Empty for manual donations.
+    tx_ref: {
+      type: String,
+      // No default: manual donations leave this unset (undefined), which a
+      // sparse index does NOT index — so multiple manual donations never
+      // collide. Chapa donations set a real tx_ref.
+      // Unique + sparse = DB-level safety net against duplicate donations from
+      // repeated Chapa callbacks / browser hits on /api/paymentComplete.
+      unique: true,
+      sparse: true,
     },
 
     receivedAt: {
@@ -69,6 +93,14 @@ const donationSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Family classification this donation is earmarked for
+    // (orphan | disabled_disease | old_age | single_mother). null = general fund.
+    familyClassification: {
+      type: String,
+      enum: ["orphan", "disabled_disease", "old_age", "single_mother"],
+      default: null,
+    },
+
     description: {
       type: String,
       trim: true,
@@ -84,6 +116,17 @@ const donationSchema = new mongoose.Schema(
     receiptUrl: {
       type: String,
       default: "",
+    },
+
+    // Source of the receipt: "chapa" (auto-generated for online donations) | "manual" (staff upload)
+    receiptType: {
+      type: String,
+      enum: ["chapa", "manual"],
+      default: null,
+    },
+    notificationSent: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

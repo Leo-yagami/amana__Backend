@@ -19,13 +19,15 @@ const donorSchema = new mongoose.Schema(
       lowercase: true,
       unique: true,
       sparse: true, // allows multiple docs with empty/null email
-      default: null,
+      // default: null,
     },
 
     phone: {
       type: String,
       trim: true,
       default: "",
+      unique: true,
+      sparse: true, // allows multiple docs with empty/null phone
       validate: {
         validator: function (value) {
           if (!value) return true; // allow empty phone
@@ -38,8 +40,30 @@ const donorSchema = new mongoose.Schema(
 
     donorType: {
       type: String,
-      enum: ["Individual", "Corporate", "Foundation", "Organization"],
+      enum: ["Individual", "Corporate", "Foundation", "Organization", "Embassy"],
       default: "Individual",
+    },
+
+    // Shown on the public partners landing section for Organization / Embassy donors.
+    // The year the organization / embassy was established (used as "Est." date).
+    establishmentDate: {
+      type: Date,
+      default: null,
+    },
+
+    // Primary kind of aid this partner provides (Organization / Embassy only).
+    primaryAid: {
+      type: String,
+      enum: [
+        "emergency_relief",
+        "child_welfare",
+        "medical_aid",
+        "food_distribution",
+        "education_fund",
+        "wash_programs",
+        "other",
+      ],
+      default: null,
     },
 
     notes: {
@@ -57,6 +81,12 @@ const donorSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: "",
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
 
     registeredAt: {

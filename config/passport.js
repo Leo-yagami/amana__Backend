@@ -15,7 +15,15 @@ passport.use(
         // Check if user already exists with this Google ID
         let user = await User.findOne({ googleId: profile.id });
 
-        if (user) return done(null, user);
+        if (user) {
+          // Refresh avatar on every sign-in
+          const photo = profile.photos[0]?.value;
+          if (user.avatar !== photo) {
+            user.avatar = photo;
+            await user.save();
+          }
+          return done(null, user);
+        }
 
         // Create new user if not found
         user = await User.create({

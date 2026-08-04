@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
     unique: true 
   },
   name: { type: String, required: true },
+  phoneNumber: { type: String, unique: true, sparse: true },
   
   // Local auth fields
   password: { type: String }, // null for OAuth users
@@ -19,7 +20,7 @@ const userSchema = new mongoose.Schema({
   // OAuth fields
   googleId: { type: String, unique: true, sparse: true },
   avatar: { type: String },
-  
+  donorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Donor' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

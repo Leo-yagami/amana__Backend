@@ -33,7 +33,7 @@ googleAuthRoutes.get('/google/callback',
         notes: 'logged in from google!'
       };
 
-      let donor = await Donor.findOne({ name: payload.name });
+      let donor = await Donor.findOne({ email: payload.email });
       if (!donor) {
         await Donor.create(payload);
       }
@@ -46,6 +46,7 @@ googleAuthRoutes.get('/google/callback',
         userId: req.user._id,
         userName: req.user.name,
         userEmail: req.user.email,
+        userAvatar: req.user.avatar,
       });
       setTimeout(() => handoffStore.delete(code), 60 * 1000);
 
@@ -86,8 +87,9 @@ googleAuthRoutes.post('/exchange', (req, res) => {
     message: 'ok',
     user: {
       _id: record.userId,
-      name: record.userName,
+      fullName: record.userName,
       email: record.userEmail,
+      avatar: record.userAvatar,
     },
     token
   });

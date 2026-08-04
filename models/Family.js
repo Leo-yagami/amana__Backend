@@ -17,6 +17,20 @@ const MemberSchema = new mongoose.Schema(
     orphanType: { type: String, enum: ["none", "mother", "father", "both"], default: "none" },
 
     photoUrl: { type: String, default: "" },
+    memberClassification: {
+      type: String,
+      enum: ["orphan", "disabled_disease", "old_age", "single_mother"],
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
+const DocumentSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    url: { type: String, required: true, trim: true },
+    uploadedAt: { type: Date, default: Date.now },
   },
   { _id: false }
 );
@@ -42,15 +56,41 @@ const FamilySchema = new mongoose.Schema(
       default: "medium",
     },
 
+    // Family group used for donation earmarking / filtering.
+    // Mirrors the donation familyClassification enum.
+    familyClassification: {
+      type: String,
+      enum: ["orphan", "disabled_disease", "old_age", "single_mother", ""],
+      default: "",
+    },
+
     // family-level verification (you already use this concept)
     isVerified: { type: Boolean, default: false },
+
+    // ===== OLD (commented) =====
+    // registrationStatus: {
+    //   type: String,
+    //   enum: ["incomplete", "pending", "verified"],
+    //   default: function(){
+    //     return this.registrationType === "quick"? "incomplete" : "pending";
+    //   },
+    // },
+
     registrationStatus: {
       type: String,
-      enum: ["incomplete", "pending", "verified"],
+      enum: ["incomplete", "pending", "verified", "rejected"],
       default: function(){
         return this.registrationType === "quick"? "incomplete" : "pending";
       },
     },
+
+    // Classification(s) when verified: orphan, disabled_disease, old_age, single_mother
+    familyClassification: {
+      type: [String],
+      enum: ["orphan", "disabled_disease", "old_age", "single_mother"],
+      default: [],
+    },
+
     verifiedBy: { type: String, default: "" },
     verifiedAt: { type: Date },
 
@@ -76,6 +116,12 @@ const FamilySchema = new mongoose.Schema(
 
     // support tracking (optional)
     lastSupportedAt: { type: Date },
+
+    // documents backing up additional details
+    documents: {
+      type: [DocumentSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
@@ -134,17 +180,54 @@ FamilySchema.statics.countCritical = function () {
   return this.countDocuments({ urgencyLevel: "critical" });
 };
 
+// Classification statics
+FamilySchema.statics.countByClassification = function () {
+  return this.aggregate([
+    { $match: { registrationStatus: "verified", familyClassification: { $ne: [], $exists: true } } },
+    { $unwind: "$familyClassification" },
+    { $group: { _id: "$familyClassification", count: { $sum: 1 } } },
+  ]);
+};
+
+FamilySchema.statics.countOrphan = function () {
+  return this.countDocuments({ registrationStatus: "verified", familyClassification: "orphan" });
+};
+
+FamilySchema.statics.countDisabledDisease = function () {
+  return this.countDocuments({ registrationStatus: "verified", familyClassification: "disabled_disease" });
+};
+
+FamilySchema.statics.countOldAge = function () {
+  return this.countDocuments({ registrationStatus: "verified", familyClassification: "old_age" });
+};
+
+FamilySchema.statics.countSingleMother = function () {
+  return this.countDocuments({ registrationStatus: "verified", familyClassification: "single_mother" });
+};
+
 // One-call helper to get everything at once
 FamilySchema.statics.getFamiliesPageStats = async function () {
-  const [total, verified, pending, incomplete, urgent] = await Promise.all([
+  const [total, verified, pending, incomplete, urgent, classifications] = await Promise.all([
     this.countTotal(),
     this.countVerified(),
     this.countPending(),
     this.countIncomplete(),
     this.countUrgent(),
+    this.countByClassification(),
   ]);
 
-  return { total, verified, pending, incomplete, urgent };
+  const classMap = {};
+  classifications.forEach(c => { classMap[c._id] = c.count; });
+
+  return {
+    total, verified, pending, incomplete, urgent,
+    classifications: {
+      orphan: classMap["orphan"] || 0,
+      disabled_disease: classMap["disabled_disease"] || 0,
+      old_age: classMap["old_age"] || 0,
+      single_mother: classMap["single_mother"] || 0,
+    },
+  };
 };
 
 module.exports = mongoose.model("Family", FamilySchema);
