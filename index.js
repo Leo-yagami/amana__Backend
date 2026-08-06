@@ -342,9 +342,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,
-    sameSite: "none",
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    secure: false, // Changed from true - Google OAuth needs same-site cookies in production too
+    sameSite: "lax", // Changed from "none" - Google OAuth requires same-site cookies
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    httpOnly: true
   }
 }));
 

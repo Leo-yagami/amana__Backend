@@ -27,10 +27,22 @@ googleAuthRoutes.get('/google',
 
 // Google OAuth callback
 googleAuthRoutes.get('/google/callback',
-  passport.authenticate('google', { 
-    failureRedirect: '/login?error=google_failed',
-    session: false // We use JWT, not sessions
-  }),
+  (req, res, next) => {
+    passport.authenticate('google', { 
+      failureRedirect: '/login?error=google_failed',
+      session: false
+    })(req, res, (err) => {
+      if (err) {
+        console.error('Passport error:', err);
+        return res.redirect('/login?error=passport_error');
+      }
+      if (!req.user) {
+        console.error('No user found after Google auth');
+        return res.redirect('/login?error=google_failed');
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       // ── 1. Create / find Donor record ──
