@@ -342,8 +342,8 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Changed from true - Google OAuth needs same-site cookies in production too
-    sameSite: "lax", // Changed from "none" - Google OAuth requires same-site cookies
+    secure: process.env.NODE_ENV === 'production',   // must be true in prod (HTTPS) for sameSite:"none" to work
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax", // cross-origin requires "none"; lax is fine for localhost
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true
   }
